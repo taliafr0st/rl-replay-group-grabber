@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 import auth from './auth/auth.json';
-import { ApplicationCommandData, Client, Collection, Events, GatewayIntentBits, REST, Routes } from "discord.js";
+import { ApplicationCommandData, BaseInteraction, Client, Collection, Events, GatewayIntentBits, REST, Routes } from "discord.js";
 
 const commands : Collection<string, Function> = new Collection();
 
@@ -51,24 +51,26 @@ client.once(Events.ClientReady, c => {
 });
 client.login(auth['discord-token']);
 
-// const rest = new REST().setToken(auth['discord-token']);
+client.on(Events.InteractionCreate, async function(interaction : BaseInteraction) {
+	if (!interaction.isChatInputCommand()) return;
 
-// (async () => {
-// 	try {
-// 		console.log(`Started reloading ${commands.size} application (/) commands.`);
+	const command = commands.get(interaction.commandName);
 
-// 		// The put method is used to fully refresh all commands in the guild with the current set
-// 		const data = await rest.post(
-// 			Routes.applicationCommands(auth['discord-application-id']),
-// 			{ body: commands },
-// 		);
+	if (!command) {
+		console.error(`No command matching ${interaction.commandName} was found.`);
+		return;
+	}
 
-//         console.log(data);
-// 		console.log(`Successfully reloaded application (/) commands.`);
-// 	} catch (error) {
-// 		// And of course, make sure you catch and log any errors!
-// 		console.error(error);
-// 	}
-// })();
+	try {
+		await command(interaction);
+	} catch (error) {
+		console.error(error);
+		if (interaction.replied || interaction.deferred) {
+			await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
+		} else {
+			await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+		}
+	}
+});
 
 module.exports = {client, commands};
